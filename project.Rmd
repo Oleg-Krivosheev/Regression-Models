@@ -1,0 +1,239 @@
+---
+title: "Essay on the the Cars Mileage"
+author: "Oleg Krivosheev"
+output:
+  pdf_document: default
+  html_document:
+    keep_md: yes
+---
+
+```{r global_options, include=FALSE}
+library(knitr)
+options(width = 68)
+opts_chunk$set(fig.width=8, fig.height=3.2, warning=FALSE, message=FALSE)
+```
+
+## Executive Summary
+
+Dataset **mtcars** from the 1974 *Motor Trend US* magazine is used to evaluate the effect of
+transmission assembly on the car mileage, expressed in miles per gallon (MPG).
+For all control variables considered together, we discovered there is a significant effect,
+while for transmission regressor alone desired effect is not quite significant.
+Only with inclusion of the additional regressors like weight and quarter mile time, we were able to
+describe the mileage better than 88%. Holding quoter mile time and weight constant, cars with manual
+transmission will have intercept higher by 14.08 and additional weight slope of -4.141.
+
+```{r, echo=FALSE}
+check_and_install <- function( packname ) { # given package name, check installation, install if not found
+    if ( packname %in% rownames(installed.packages()) == FALSE ) {
+        install.packages( packname )
+    }
+}
+
+check_and_install("ggplot2")
+check_and_install("cowplot")
+check_and_install("data.table")
+
+require(ggplot2)
+require(cowplot)
+require(data.table) # superior in all ways to the data frame
+```
+
+## Exploratory data analysis
+
+First, we load data and convert it to `data.table`. 
+
+```{r, echo=TRUE, results="hide"}
+data(mtcars); dt <- as.data.table(mtcars)
+```
+
+All relevant variables are made into factors.
+What we're interested in are `am` column, whcih indicates whether
+car has automatic (am=0) or manual (am=1) transmission. From the summary table for the whole dataset, 
+one could notice that mean value of the `am` column is about 41%, which means we have roughly 60% cars with automatic transmission.
+
+```{r, echo=FALSE, results="hide"}
+#dt[, am  := 1-am]
+dt[, cyl := factor(cyl)]
+dt[, vs  := factor(vs)]
+dt[, am  := factor(am)]
+dt[, gear := factor(gear)]
+dt[, carb := factor(carb)]
+```
+
+In **Appendix A** we display summary tables for all relevant variables in the *mtcars* dataset In **Appendix B** we plot the MPG vs weight dependency and MPG vs quater mile time dependency grouped by transmission value. We can see both plots indicates high level of dependencies.
+
+## Regression Models
+
+```{r, echo=FALSE, results="hide"}
+q <- dt[, am==0]
+mauto <- round(mean(dt[q]$mpg), 2)
+q <- dt[, am==1]
+mman <- round(mean(dt[q]$mpg), 2)
+```
+
+We computed mean MPG values for the cars with automatic transmission and it is equal to `r mauto`, which is significantly lower than
+same value of `r mman` for a manual transmission. What factors affect such difference in MPG lead us to build and analyse models.
+
+First, we build full regression model, where `MPG` depends on all regressors available to us.
+
+```{r, echo=TRUE, results="hide"}
+fit.all <- lm(mpg ~ ., data = dt)
+```
+
+```{r, echo=FALSE, results="hide"}
+summary(fit.all)
+```
+
+In this model, the produced summary tells us that we have adjusted R$^2$ equal to 0.78, thus the full model leave unexplained only
+22% of the variation in the residuals. Residual standard error is equal to 2.833, with 15 degress of freedom. From the other hand, 
+none of the regressors are marked by stars in the summary table, they are not significant at 5% significance level.
+Thus, we believe fitting so many regressors lead to multicollinearity and overfitting with inflated estimated standard error.
+
+Baseline model to build is where MPG depends on transmission regressor only, and no other regressors are included.
+
+```{r, echo=TRUE, results="hide"}
+fit.base <- lm(mpg ~ am, data = dt)
+```
+
+```{r, echo=FALSE, results="hide"}
+summary(fit.base)
+```
+
+From fitting the baseline model we know that while we have highest significance indicator (three stars), the adjusted R$^2$
+is only 0.34, thus implying transmission assembly factor alone has quite small explanatory power. Residual standard error is
+also higher, at 4.9. We plot both all inclusive and baseline model in **Appendix C** and **D**.
+
+We will use *Akaike's Information Criterion*, AIC. It is equal to the log of the likelyhood and proportional to the number of parameters.
+$$
+AIC = - 2*log(L) + C * N_{par},
+$$
+where $N_{par}$ is number of parameters, $L$ is likelyhood, and coefficient $C$ is equal to $2$ for classical AIC or $log(N_{obs})$ for BIC. We will use `step` function to get a clue about better model.
+
+```{r, echo=TRUE, results="hide"}
+fit.step <- step(fit.all, k=log(nrow(dt)))
+```
+
+```{r, echo=FALSE, results='hide'}
+summary(fit.step)
+```  
+
+As a result of the AIC test, we could conclude that good linear mode shall include `wt`,  `qsec` and `am` as regressors. We build and
+check this model.
+
+```{r, echo=TRUE, results="hide"}
+fit.aic <- lm(mpg ~ wt + qsec + am, data = dt)
+```
+
+```{r, echo=FALSE, results="hide"}
+summary(fit.aic)
+```
+
+Indeed, we have now R$^2$ equal to 0.83, which left only 17% of the residual variance unexplained. Residual standard error is equal to 2.46. All regressors are  significant at least 0.05 significance level. We believe, looking at scatter plots, there is a significant interaction between weight and transmission assembly. We would like to build model which reflects such interaction.
+
+```{r, echo=TRUE, results="hide"}
+fit.best <- lm(mpg ~ qsec + wt * am, data = dt)
+```
+
+```{r, echo=FALSE, results="hide"}
+summary(fit.best)
+```
+
+This model is clearly the best so far. All regressors including `qsec`, `wt`, `am` and `wt:am` are significant with level of significance at least 0.01. Adjusted R$^2$ is equal to 0.88, which means 88% of the variance of the residuals described by this model. Residual standard error is equal to 2.08 on 27 degress of freedom. Plots for AIC model and the best model could be found in **Appendix E** and **F**. Final MPG model best fit is
+$$
+MPG = 9.723 + 1.017*qsec - 2.937*wt + 14.079*am - 4.141*wt*am
+$$
+For `am` equal to 0 (auto) vs `am` equal to 1 (manual), holding weight and quater mile time constant, we got a lot higher intercept (+14.079)
+and additional negative weight slope of -4.141.
+
+## Analysis
+
+Confidence interval, using t-test, is equal to
+```{r, echo=FALSE}
+print(round(t(confint(fit.best)),3))
+```
+
+ANOVA test for all models is included into **Appendix G**, as well as confidence interval for the best model.
+
+## References
+
+All project files could be downloaded from my github [page](https://github.com/Oleg-Krivosheev/Regression-Model). Cowplot package was
+taken from [here](https://cran.r-project.org/web/packages/cowplot/vignettes/introduction.html).
+
+$\pagebreak$
+
+## Appendix A
+
+```{r, echo = FALSE}
+kable(summary(mtcars[1:5]))
+kable(summary(mtcars[6:10]))
+```
+
+## Appendix B
+
+```{r, echo=FALSE}
+p1 <-  ggplot(dt, aes(x=wt, y=mpg, group=am, color=am, height=3, width=3)) +
+       geom_point() +  
+       scale_colour_discrete(labels=c("Auto", "Manual")) + 
+       xlab("Weight, thnd lbs") +
+       ylab("MPG") +
+       ggtitle("MPG vs. Weight by Transmission")
+```
+
+```{r, echo=FALSE}
+p2 <-  ggplot(dt, aes(x=qsec, y=mpg, group=am, color=am, height=3, width=3)) +
+       geom_point() +  
+       scale_colour_discrete(labels=c("Auto", "Manual")) + 
+       xlab("Quarter mile time, sec") +
+       ylab("MPG") +
+       ggtitle("MPG vs. Qsec by Transmission")
+
+plot_grid(p1, p2, align='h', labels=c('', ''))
+```
+
+$\pagebreak$
+
+## Appendix C
+
+Plot fot all regressors included model
+
+```{r, echo=FALSE, fig.height=2.7}
+par(mfrow = c(1,4))
+plot(fit.all)
+```
+
+## Appendix D
+
+Plot for MPG vs transmission regressor model
+
+```{r, echo=FALSE, fig.height=2.7}
+par(mfrow = c(1,4))
+plot(fit.base)
+```
+
+## Appendix E
+
+Plot for MPG vs weight + qsec + transmission regressors model
+
+```{r, echo=FALSE, fig.height=2.7}
+par(mfrow = c(1,4))
+plot(fit.aic)
+```
+
+## Appendix F
+
+Plot for MPG vs qsec + weight*transmission regressors model
+
+```{r, echo=FALSE, fig.height=2.7}
+par(mfrow = c(1,4))
+plot(fit.best)
+```
+
+## Appendix G
+
+ANOVA test for all four models
+
+```{r, echo=TRUE}
+anova(fit.all, fit.base, fit.aic, fit.best) 
+confint(fit.best)
+```
