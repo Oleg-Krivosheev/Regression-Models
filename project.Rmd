@@ -158,7 +158,7 @@ ANOVA test for all models is included into **Appendix G**, as well as confidence
 
 ## References
 
-All project files could be downloaded from my github [page](https://github.com/Oleg-Krivosheev/Regression-Model). Cowplot package was
+All project files could be downloaded from my github [page](https://github.com/Oleg-Krivosheev/Regression-Models). Cowplot package was
 taken from [here](https://cran.r-project.org/web/packages/cowplot/vignettes/introduction.html).
 
 $\pagebreak$
