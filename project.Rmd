@@ -73,7 +73,8 @@ mman <- round(mean(dt[q]$mpg), 2)
 ```
 
 We computed mean MPG values for the cars with automatic transmission and it is equal to `r mauto`, which is significantly lower than
-same value of `r mman` for a manual transmission. What factors affect such difference in MPG lead us to build and analyse models.
+same value of `r mman` for a manual transmission cars. What factors affect such difference in MPG lead us to build, analyse and compare
+ different models.
 
 First, we build full regression model, where `MPG` depends on all regressors available to us.
 
